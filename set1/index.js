@@ -25,18 +25,20 @@ function xorCharByChar(input, key, enc='hex') {
     return input.split('').map((c, i) => xor(c, key.split('')[i % key.length]).toString(enc)).join('')
 }
 
+const ham = (t1, t2) => hamming(new Buffer(first), new Buffer(second))
+
 // 6
 function challenge6() {
-    const keySizesToTest = [...Array(40).keys()].map(x => x+1)
     const test = 'this is a test'
     const wokka = 'wokka wokka!!!'
     assert.equal(hamming(new Buffer(test), new Buffer(wokka)), 37)
+    const keySizesToTest = [...Array(40).keys()].map(x => x+1)
     const text = fs.readFileSync('./6.txt', 'base64') // hex
     const hammings = {}
     keySizesToTest.forEach(size => {
         const first = text.substring(0, size)
         const second = text.substring(size, size * 2)
-        const normalized = hamming(new Buffer(first), new Buffer(second)) / size
+        const normalized = ham(first, second) / size
         console.log('key size', size, normalized)
         hammings[size] = normalized
     })
