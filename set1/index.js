@@ -1,6 +1,8 @@
 const R = require('ramda')
 const xor = require('bitwise-xor')
 const fs = require('fs')
+const assert = require('assert')
+const hamming = require('hamming-distance')
 
 const hex2base64 = str => new Buffer(str, 'hex').toString('base64')
 
@@ -17,6 +19,39 @@ function printIfCleartext(str, original = '') { 
     if (sco > 2) { 
         console.log(str, sco, original) 
     } 
+}
+
+function xorCharByChar(input, key, enc='hex') {
+    return input.split('').map((c, i) => xor(c, key.split('')[i % key.length]).toString(enc)).join('')
+}
+
+// 6
+function challenge6() {
+    const keySizesToTest = [...Array(40).keys()].map(x => x+1)
+    const test = 'this is a test'
+    const wokka = 'wokka wokka!!!'
+    assert.equal(hamming(new Buffer(test), new Buffer(wokka)), 37)
+    const text = fs.readFileSync('./6.txt', 'base64') // hex
+    const hammings = {}
+    keySizesToTest.forEach(size => {
+        const first = text.substring(0, size)
+        const second = text.substring(size, size * 2)
+        const normalized = hamming(new Buffer(first), new Buffer(second)) / size
+        console.log('key size', size, normalized)
+        hammings[size] = normalized
+    })
+    const probableKeySizes = R.take(4, R.sortBy(pair => pair[1], R.toPairs(hammings))).map(R.prop(0))
+    // TODO: continue from part 5
+    assert(false)
+}
+
+// 5
+function challenge5() {
+    const cleartext = `Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal`
+    const key = 'ICE'
+    const cipher = xorCharByChar(cleartext, key)
+    console.log(cipher)
+    console.log(xorCharByChar(xorCharByChar(cleartext, key), key))
 }
 
 // 4
@@ -48,4 +83,4 @@ function challenge1() {
 }
 
 // run challenge
-challenge4()
+challenge6()
