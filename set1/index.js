@@ -25,7 +25,7 @@ function xorCharByChar(input, key, enc='hex') {
     return input.split('').map((c, i) => xor(c, key.split('')[i % key.length]).toString(enc)).join('')
 }
 
-const ham = (t1, t2) => hamming(new Buffer(first), new Buffer(second))
+const ham = (t1, t2) => hamming(new Buffer(t1), new Buffer(t2))
 
 // 6
 function challenge6() {
@@ -39,10 +39,10 @@ function challenge6() {
         const first = text.substring(0, size)
         const second = text.substring(size, size * 2)
         const normalized = ham(first, second) / size
-        console.log('key size', size, normalized)
         hammings[size] = normalized
     })
     const probableKeySizes = R.take(4, R.sortBy(pair => pair[1], R.toPairs(hammings))).map(R.prop(0))
+    console.log('probable key sizes are:', probableKeySizes.join(', '))
     // TODO: continue from part 5
     assert(false)
 }
