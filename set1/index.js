@@ -1,4 +1,5 @@
 const R = require('ramda')
+const crypto = require('crypto')
 const xor = require('bitwise-xor')
 const fs = require('fs')
 const assert = require('assert')
@@ -29,7 +30,7 @@ function xorCharByChar(input, key, enc='hex') {
     }
 }
 
-const loadCipherText = file => new Buffer(fs.readFileSync('./6.txt').toString(), 'base64')
+const loadCipherText = file => new Buffer(fs.readFileSync(file).toString(), 'base64')
 
 const ham = (t1, t2) => hamming(new Buffer(t1), new Buffer(t2))
 function determineProbableKeySize(bytes) {
@@ -107,6 +108,21 @@ function solveRepeatingCipher(cipher) {
     }, {score: 0, decrypted: ''}, possibleDecryptions)    
 }
 
+function decryptAes128Ceb(buffer, key) {
+    var cipher = crypto.createDecipheriv("aes-128-ecb", new Buffer(key), '')
+    cipher.setAutoPadding(false)
+    var buf = cipher.update(new Buffer(buffer), 'base64')
+    buf = Buffer.concat([buf, cipher.final()])
+    return buf.toString()
+}
+
+function challenge7() {
+    const key = 'YELLOW SUBMARINE'
+    const cipher = loadCipherText('./7.txt')
+    const result = decryptAes128Ceb(cipher, key)
+    console.log(result)
+}
+
 // 6
 function challenge6() {
     const test = 'this is a test'
@@ -175,4 +191,4 @@ Play that funky mu`
 const enc = xorCharByChar(clear, 'ICE')
 // run challenge
 // console.log(solveRepeatingCipher(new Buffer(enc, 'hex')))
-challenge6()
+challenge7()
