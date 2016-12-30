@@ -116,18 +116,24 @@ function decryptAes128Ceb(buffer, key) {
     return buf.toString()
 }
 
+function detectECBmode(line) {
+    const buffer = new Buffer(line, 'base64')
+    var currentMaxScore = 0
+    let message = ''
+    for (let blockSize = 2; blockSize<=32; blockSize=blockSize*2) {
+        const blocks = R.splitEvery(blockSize, buffer)
+        const score = blocks.length - R.uniq(blocks).length
+        if (score > currentMaxScore) {
+            currentMaxScore = score
+            message = `line ${line} has repeating pattern with block size ${blockSize} bytes, repeating block count: ${score}`
+        }
+    }
+    if (currentMaxScore > 10) console.log(message)
+}
+
 function challenge8() {
     const lines = fs.readFileSync('./8.txt', 'utf8').split('\n')
-    lines.forEach(l => {
-        const buffer = new Buffer(l, 'base64')
-        for (let blockSize = 2; blockSize<=32; blockSize=blockSize*2) {
-            const blocks = R.splitEvery(blockSize, buffer)
-            const score = blocks.length - R.uniq(blocks).length
-            if (score > 10) {
-                console.log(`line ${l} has repeating pattern with block size ${blockSize} bytes, repeating block count: ${score}`)
-            }
-        }
-    })
+    lines.forEach(l => detectECBmode(l))
 }
 
 function challenge7() {
