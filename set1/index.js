@@ -116,6 +116,20 @@ function decryptAes128Ceb(buffer, key) {
     return buf.toString()
 }
 
+function challenge8() {
+    const lines = fs.readFileSync('./8.txt', 'utf8').split('\n')
+    lines.forEach(l => {
+        const buffer = new Buffer(l, 'base64')
+        for (let blockSize = 2; blockSize<=32; blockSize=blockSize*2) {
+            const blocks = R.splitEvery(blockSize, buffer)
+            const score = blocks.length - R.uniq(blocks).length
+            if (score > 10) {
+                console.log(`line ${l} has repeating pattern with block size ${blockSize} bytes, repeating block count: ${score}`)
+            }
+        }
+    })
+}
+
 function challenge7() {
     const key = 'YELLOW SUBMARINE'
     const cipher = loadCipherText('./7.txt')
@@ -191,4 +205,4 @@ Play that funky mu`
 const enc = xorCharByChar(clear, 'ICE')
 // run challenge
 // console.log(solveRepeatingCipher(new Buffer(enc, 'hex')))
-challenge7()
+challenge8()
