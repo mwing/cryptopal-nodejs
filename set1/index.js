@@ -22,29 +22,98 @@ function printIfCleartext(str, original = '') { 
 }
 
 function xorCharByChar(input, key, enc='hex') {
-    return input.split('').map((c, i) => xor(c, key.split('')[i % key.length]).toString(enc)).join('')
+    if (typeof input === 'string') {
+        return input.split('').map((c, i) => xor(c, key.length > 1 ? key.split('')[i % key.length]: key).toString(enc)).join('')
+    } else if (typeof input === 'object') {
+        return input.map((c, i) => xor(c, key.slice(i % key.length, i % key.length + 1)).toString(enc)).join('')
+    }
 }
 
+const loadCipherText = file => new Buffer(fs.readFileSync('./6.txt').toString(), 'base64')
+
 const ham = (t1, t2) => hamming(new Buffer(t1), new Buffer(t2))
+function determineProbableKeySize(bytes) {
+    console.log(bytes.slice(0,10))
+    const keySizesToTest = [...Array(40).keys()].map(x => x+1)
+    const hammings = {}
+    keySizesToTest.forEach(size => {
+        const first = bytes.slice(0, size)
+        const second = bytes.slice(size, size * 2)
+        const third = bytes.slice(size * 2, size * 3)
+        const fourth = bytes.slice(size * 3, size * 4)
+        if (R.uniq([first, second, third, fourth].map(x => x.length)).length !== 1) return
+        const normalized = ham(first, second) / size
+        const normalized2 = ham(first, third) / size
+        const normalized3 = ham(first, fourth) / size
+        const normalized4 = ham(second, third) / size
+        const normalized5 = ham(third, fourth) / size
+        // console.log(normalized, normalized2, normalized3)
+        hammings[size] = (normalized + normalized2 + normalized3 + normalized4 + normalized5) / 5
+        // hammings[size] = normalized
+    })
+    return R.take(4, R.sortBy(pair => pair[1], R.toPairs(hammings))).map(R.prop(0)).map(x => Number(x)) // take 4 for now
+}
+
+const xorWithSingleByte = (buffer, charCode) => {
+    // console.log(`xor buffer with charCode ${charCode}, buffer length ${buffer.length}`)
+    const result = []
+    const keyB = new Buffer(String.fromCharCode(charCode))
+    for (let i = 0; i < buffer.length; i++) result.push(buffer[i] ^ keyB[0])
+    return new Buffer(result).toString('ascii')
+}
+
+function solveKeyForSingleByteXor(transposed) {
+    const pickBest = (prevBest, char) => {
+        const xorred = xorWithSingleByte(transposed, char)
+        const scored = R.sum(R.map(score, xorred))
+        if (scored > prevBest.score) {
+            // console.log(`${char} was better than previous best with score ${scored}, res ${xorred}`)
+            return {char, score: scored}
+        } 
+        return prevBest
+    }
+    return R.reduce(pickBest, {'char': '', score: 0}, chars)
+}
+
+function solveForKeySize(cipherB, keySize) {
+    // Now that you probably know the KEYSIZE: break the ciphertext into blocks of KEYSIZE length.
+    const chunks = R.splitEvery(keySize, cipherB)
+    // Now transpose the blocks: make a block that is the first byte of every block, and a block that is the second byte of every block, and so on.
+    const transposed = R.times(i => {
+        return Buffer.concat(chunks.map(chunk => chunk.slice(i, i+1)))
+    }, keySize)
+    // Solve each block as if it was single-character XOR. You already have code to do this.
+    console.log(`splitted and transposed into ${transposed.length} chunks`)
+    const solvedKeys = transposed.map(tr => solveKeyForSingleByteXor(tr))
+    // For each block, the single-byte XOR key that produces the best looking histogram is the repeating-key XOR key byte for that block. Put them together and you have the key.        
+    return solvedKeys.map(x => x.char)
+}
 
 // 6
 function challenge6() {
     const test = 'this is a test'
     const wokka = 'wokka wokka!!!'
     assert.equal(hamming(new Buffer(test), new Buffer(wokka)), 37)
-    const keySizesToTest = [...Array(40).keys()].map(x => x+1)
-    const text = fs.readFileSync('./6.txt', 'base64') // hex
-    const hammings = {}
-    keySizesToTest.forEach(size => {
-        const first = text.substring(0, size)
-        const second = text.substring(size, size * 2)
-        const normalized = ham(first, second) / size
-        hammings[size] = normalized
-    })
-    const probableKeySizes = R.take(4, R.sortBy(pair => pair[1], R.toPairs(hammings))).map(R.prop(0))
+
+    // Load encrypted text and make a byte buffer out of it
+    const cipher = loadCipherText('./6.txt')
+
+    // Determine probable key sizes
+    const probableKeySizes = determineProbableKeySize(cipher)
     console.log('probable key sizes are:', probableKeySizes.join(', '))
-    // TODO: continue from part 5
-    assert(false)
+
+    // Find out possible keys based on the most likely key sizes
+    const suspectKeys = probableKeySizes.map(size => solveForKeySize(cipher, size))
+    console.log('keys that might work:', suspectKeys.map(r => r.map(c => String.fromCharCode(c)).join('')))
+    
+    // Try decrypting with the possible keys & use statistics to find out the most likely match
+    const keys = suspectKeys.map(key => key.map(c => String.fromCharCode(c)).join(''))
+    const possibleDecryptions = keys.map(key => xorBstr(cipher, key.repeat(cipher.length/key.length)))
+    const best = R.reduce((candidate, text) => {
+        const scored = R.sum(R.map(score, text))
+        return scored > candidate.score ? {score: scored, text} : candidate
+    }, {score: 0, decrypted: ''}, possibleDecryptions)
+    console.log(best.text)
 }
 
 // 5
@@ -62,15 +131,16 @@ function challenge4() {
     fs.readFile('./4.txt', 'utf8', (e, data) => {
         const lines = data.split('\n')
         lines.forEach(line => {
-            chars.forEach(x => printIfCleartext(xorBstr(str2b(line), Buffer.allocUnsafe(line.length).fill(x)), line))
+            chars.forEach(x => printIfCleartext(xorBstr(str2b(line), Buffer.allocUnsafe(line.length).fill(x))))
         })
     })
 }
 
-// 3
+// 3 Single-byte XOR cipher
 function challenge3() {
     const c3b = str2b('1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736')
-    const c3res = chars.forEach(x => printIfCleartext(xorBstr(c3b, Buffer.allocUnsafe(68).fill(x))))
+    const c3res = chars.forEach(x => printIfCleartext(xorBstr(c3b, Buffer.allocUnsafe(68).fill(x)), `>${x}<`))
+    assert.equal(88, solveKeyForSingleByteXor(c3b).char) // 88 is keyCode for 'X'
 }
 
 // 2
@@ -86,4 +156,6 @@ function challenge1() {
 }
 
 // run challenge
+// console.log(determineProbableKeySize(new Buffer('0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f', 'base64')))
+// solveForKeySize(new Buffer('0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f', 'base64'), 3)
 challenge6()
