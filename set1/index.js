@@ -116,8 +116,8 @@ function decryptAes128Ceb(buffer, key) {
     return buf.toString()
 }
 
-function detectECBmode(line) {
-    const buffer = new Buffer(line, 'base64')
+function detectECBmode(text) {
+    const buffer = new Buffer(text, 'base64')
     var currentMaxScore = 0
     let message = ''
     for (let blockSize = 2; blockSize<=32; blockSize=blockSize*2) {
@@ -125,7 +125,7 @@ function detectECBmode(line) {
         const score = blocks.length - R.uniq(blocks).length
         if (score > currentMaxScore) {
             currentMaxScore = score
-            message = `line ${line} has repeating pattern with block size ${blockSize} bytes, repeating block count: ${score}`
+            message = `text ${text} has repeating pattern with block size ${blockSize} bytes, repeating block count: ${score}`
         }
     }
     if (currentMaxScore > 10) console.log(message)
