@@ -11,10 +11,10 @@ const xorBstr = (b1, b2) => xor(b1, b2).toString('utf8')
 const str2b = str => new Buffer(str, 'hex')
 
 const chars = Buffer.from([...Array(256).keys()])
-const freq = {'a': 0.0651738,'b': 0.0124248,'c': 0.0217339,'d': 0.0349835,'e': 0.1041442,'f': 0.0197881,'g': 0.0158610,'h': 0.0492888,'i': 0.0558094,'j': 0.0009033,'k': 0.0050529,'l': 0.0331490,'m': 0.0202124,'n': 0.0564513,'o': 0.0596302,   'p': 0.0137645, 'q': 0.0008606, 'r': 0.0497563,'s': 0.0515760,'t': 0.0729357,'u': 0.0225134,'v': 0.0082903,'w': 0.0171272,'x': 0.0013692,'y': 0.0145984, 'z': 0.0007836, ' ': 0.1918182}
+const freq = {'a': 0.0651738,'b': 0.0124248,'c': 0.0217339,'d': 0.0349835,'e': 0.1041442,'f': 0.0197881,'g': 0.0158610,'h': 0.0492888,'i': 0.0558094,'j': 0.0009033,'k': 0.0050529,'l': 0.0331490,'m': 0.0202124,'n': 0.0564513,'o': 0.0596302,   'p': 0.0137645, 'q': 0.0008606, 'r': 0.0497563,'s': 0.0515760,'t': 0.0729357,'u': 0.0225134,'v': 0.0082903,'w': 0.0171272,'x': 0.0013692,'y': 0.0145984, 'z': 0.0007836, ' ': 0.1918182 }
 const score = c => freq[c] || 0
 
-function printIfCleartext(str, original = '') { 
+function printIfCleartext(str, original = '') {
     const sco = R.sum(R.map(score, str))
     if (sco > 2) { 
         console.log(str, sco, original) 
@@ -25,7 +25,7 @@ function xorCharByChar(input, key, enc='hex') {
     if (typeof input === 'string') {
         return input.split('').map((c, i) => xor(c, key.length > 1 ? key.split('')[i % key.length]: key).toString(enc)).join('')
     } else if (typeof input === 'object') {
-        return input.map((c, i) => xor(c, key.slice(i % key.length, i % key.length + 1)).toString(enc)).join('')
+        return input.map((c, i) => xor(c, key.slice(i % key.length, i % key.length + 1)).toString(enc))
     }
 }
 
@@ -89,15 +89,7 @@ function solveForKeySize(cipherB, keySize) {
     return solvedKeys.map(x => x.char)
 }
 
-// 6
-function challenge6() {
-    const test = 'this is a test'
-    const wokka = 'wokka wokka!!!'
-    assert.equal(hamming(new Buffer(test), new Buffer(wokka)), 37)
-
-    // Load encrypted text and make a byte buffer out of it
-    const cipher = loadCipherText('./6.txt')
-
+function solveRepeatingCipher(cipher) {
     // Determine probable key sizes
     const probableKeySizes = determineProbableKeySize(cipher)
     console.log('probable key sizes are:', probableKeySizes.join(', '))
@@ -109,10 +101,23 @@ function challenge6() {
     // Try decrypting with the possible keys & use statistics to find out the most likely match
     const keys = suspectKeys.map(key => key.map(c => String.fromCharCode(c)).join(''))
     const possibleDecryptions = keys.map(key => xorBstr(cipher, key.repeat(cipher.length/key.length)))
-    const best = R.reduce((candidate, text) => {
+    return R.reduce((candidate, text) => {
         const scored = R.sum(R.map(score, text))
         return scored > candidate.score ? {score: scored, text} : candidate
-    }, {score: 0, decrypted: ''}, possibleDecryptions)
+    }, {score: 0, decrypted: ''}, possibleDecryptions)    
+}
+
+// 6
+function challenge6() {
+    const test = 'this is a test'
+    const wokka = 'wokka wokka!!!'
+    assert.equal(hamming(new Buffer(test), new Buffer(wokka)), 37)
+
+    // Load encrypted text and make a byte buffer out of it
+    const cipher = loadCipherText('./6.txt')
+
+    // Solve repeating key encrypted cipher
+    const best = solveRepeatingCipher(cipher)
     console.log(best.text)
 }
 
@@ -155,7 +160,19 @@ function challenge1() {
     console.log(c1)
 }
 
+const clear = `You thought that I was weak, Boy, you're dead wrong 
+So come on, everybody and sing this song 
+
+Say -- Play that funky music Say, go white boy, go white boy go 
+play that funky music Go white boy, go white boy, go 
+Lay down and boogie and play that funky music till you die. 
+
+Play that funky music Come on, Come on, let me hear 
+Play that funky music white boy you say it, say it 
+Play that funky music A little louder now 
+Play that funky music, white boy Come on, Come on, Come on 
+Play that funky mu`
+const enc = xorCharByChar(clear, 'ICE')
 // run challenge
-// console.log(determineProbableKeySize(new Buffer('0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f', 'base64')))
-// solveForKeySize(new Buffer('0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f', 'base64'), 3)
+// console.log(solveRepeatingCipher(new Buffer(enc, 'hex')))
 challenge6()
