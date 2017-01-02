@@ -34,7 +34,6 @@ const loadCipherText = file => new Buffer(fs.readFileSync(file).toString(), 'bas
 
 const ham = (t1, t2) => hamming(new Buffer(t1), new Buffer(t2))
 function determineProbableKeySize(bytes) {
-    console.log(bytes.slice(0,10))
     const keySizesToTest = [...Array(40).keys()].map(x => x+1)
     const hammings = {}
     keySizesToTest.forEach(size => {
@@ -43,14 +42,13 @@ function determineProbableKeySize(bytes) {
         const third = bytes.slice(size * 2, size * 3)
         const fourth = bytes.slice(size * 3, size * 4)
         if (R.uniq([first, second, third, fourth].map(x => x.length)).length !== 1) return
-        const normalized = ham(first, second) / size
-        const normalized2 = ham(first, third) / size
-        const normalized3 = ham(first, fourth) / size
-        const normalized4 = ham(second, third) / size
-        const normalized5 = ham(third, fourth) / size
-        // console.log(normalized, normalized2, normalized3)
-        hammings[size] = (normalized + normalized2 + normalized3 + normalized4 + normalized5) / 5
-        // hammings[size] = normalized
+        const h = ham(first, second) / size
+        // hammings[size] = h
+        const h2 = ham(first, third) / size
+        const h3 = ham(first, fourth) / size
+        const h4 = ham(second, third) / size
+        const h5 = ham(third, fourth) / size
+        hammings[size] = (h + h2 + h3 + h4 + h5) / 5
     })
     return R.take(4, R.sortBy(pair => pair[1], R.toPairs(hammings))).map(R.prop(0)).map(x => Number(x)) // take 4 for now
 }
@@ -84,7 +82,6 @@ function solveForKeySize(cipherB, keySize) {
         return Buffer.concat(chunks.map(chunk => chunk.slice(i, i+1)))
     }, keySize)
     // Solve each block as if it was single-character XOR. You already have code to do this.
-    console.log(`splitted and transposed into ${transposed.length} chunks`)
     const solvedKeys = transposed.map(tr => solveKeyForSingleByteXor(tr))
     // For each block, the single-byte XOR key that produces the best looking histogram is the repeating-key XOR key byte for that block. Put them together and you have the key.        
     return solvedKeys.map(x => x.char)
@@ -101,7 +98,9 @@ function solveRepeatingCipher(cipher) {
     
     // Try decrypting with the possible keys & use statistics to find out the most likely match
     const keys = suspectKeys.map(key => key.map(c => String.fromCharCode(c)).join(''))
-    const possibleDecryptions = keys.map(key => xorBstr(cipher, key.repeat(cipher.length/key.length)))
+    const possibleDecryptions = keys.map(key => xorBstr(cipher, key.repeat(cipher.length/key.length+1).slice(0, cipher.length)))
+    // Sometimes the statistical scoring function picks the wrong possible key. Other candidates might be correct ones and this prints them out
+    // console.log(possibleDecryptions)
     return R.reduce((candidate, text) => {
         const scored = R.sum(R.map(score, text))
         return scored > candidate.score ? {score: scored, text} : candidate
@@ -196,19 +195,12 @@ function challenge1() {
     console.log(c1)
 }
 
-const clear = `You thought that I was weak, Boy, you're dead wrong 
-So come on, everybody and sing this song 
-
-Say -- Play that funky music Say, go white boy, go white boy go 
-play that funky music Go white boy, go white boy, go 
-Lay down and boogie and play that funky music till you die. 
-
-Play that funky music Come on, Come on, let me hear 
-Play that funky music white boy you say it, say it 
-Play that funky music A little louder now 
-Play that funky music, white boy Come on, Come on, Come on 
-Play that funky mu`
-const enc = xorCharByChar(clear, 'ICE')
-// run challenge
-// console.log(solveRepeatingCipher(new Buffer(enc, 'hex')))
-challenge8()
+// create cleartext and encrypt it by XORring with a repeating password
+const clear = `To get in, get the hidden key from the bartender by asking him or her for an old fashioned. 
+Do not let anyone else know about this or you'll be barred entry to the VIP room.
+The VIP room is upstairs, just look for the (guarded) stairs and show the hidden key to the security guy.`
+const enc = xorCharByChar(clear, 'Reaktor2017')
+// solve and print the solution
+console.log(new Buffer(enc).toString('base64'))
+console.log(solveRepeatingCipher(new Buffer(enc, 'hex')))
+// challenge8()
