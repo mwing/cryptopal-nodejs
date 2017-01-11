@@ -130,6 +130,66 @@ function detectECBmode(text) {
     if (currentMaxScore > 10) console.log(message)
 }
 
+const mapIndexed = R.addIndex(R.map)
+
+function vigenere(text, key) {
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz'
+    const ciphers = [...Array(26).keys()].map(n => caesar(alphabet, n))
+    const vigenereMap = R.fromPairs(R.zip(alphabet.split(''), ciphers))
+    const repeatingKey = key.repeat(Math.ceil(text.length / key.length)).substring(0, text.length).split('')
+    const cipherText = mapIndexed((c, i) => {
+        const row = vigenereMap[repeatingKey[i]].split('')
+        return row[alphabet.indexOf(c)]
+    }, text)
+    return cipherText.join('')
+}
+
+function breakVigenere(cipher) {
+    const probableKeySize = [...Array(5).keys()].map(length => {
+        if (length < 3) return 0
+        const possibleRepeats = (acc) => {
+            const arr = R.concat(acc.repeats, [acc.str.substring(0,length)])
+            return {repeats: arr, str: R.tail(acc.str)}
+        }
+        const split = R.reduce(possibleRepeats, ({repeats: [], str: cipher}), cipher.split(''))
+        const distances = R.map(sub => {
+            const matches = cipher.match(new RegExp(sub, 'g'))
+            if (matches.length >1) {
+                const splits = cipher.split(sub)
+                if (splits.length >= 3 && sub.length > 2) {
+                    return R.drop(1, R.reverse(R.drop(1, splits))).map(sp => sp.length)
+                }
+                return []
+            } else {
+                return []
+            }
+        }, split.repeats)
+        // const grouped = R.take(2, R.reverse(R.sortBy(i => i[1], R.toPairs(R.countBy(R.identity, R.flatten(distances))))))
+        const grouped = R.countBy(R.identity, R.flatten(distances))
+        console.log(`size: ${length}, average distance ${require('util').inspect(grouped)}`)
+        // console.log(, grouped)
+    })
+}
+
+function shiftAlpha(charCode, shift) {
+    if (charCode >= 65 && charCode <= 90) return String.fromCharCode((charCode - 65 + shift) % 26 + 65)
+    else if (charCode >= 97 && charCode <= 122) return String.fromCharCode((charCode - 97 + shift) % 26 + 97)
+    else return String.fromCharCode(charCode)
+}
+
+function caesar(text, shift=0) {
+	return text.split('').map(c => shiftAlpha(c.charCodeAt(0), shift)).join('')
+}
+
+function breakCaesar(enc) { 
+    const scores = [...Array(26).keys()].map(n => {
+        const decrypted = caesar(enc, n)
+        const scored = R.sum(R.map(score, decrypted))
+        return {score: scored, decrypted}
+    })
+    return R.head(R.reverse(R.sortBy(item => item.score, scores)))
+}
+
 function challenge8() {
     const lines = fs.readFileSync('./8.txt', 'utf8').split('\n')
     lines.forEach(l => detectECBmode(l))
@@ -196,11 +256,24 @@ function challenge1() {
 }
 
 // create cleartext and encrypt it by XORring with a repeating password
-const clear = `To get in, get the hidden key from the bartender by asking him or her for an old fashioned. 
-Do not let anyone else know about this or you'll be barred entry to the VIP room.
-The VIP room is upstairs, just look for the (guarded) stairs and show the hidden key to the security guy.`
-const enc = xorCharByChar(clear, 'Reaktor2017')
+const clear = `President Barack Obama has bid farewell to the nation in an emotional speech that sought to comfort a country on edge over rapid economic changes, persistent security threats and the election of Donald Trump.
+Forceful at times and tearful at others, Obama's valedictory speech in his hometown of Chicago was a public meditation on the many trials the U.S. faces as Obama takes his exit. For the challenges that are new, Obama offered his vision for how to surmount them, and for the persistent problems he was unable to overcome, he offered optimism that others, eventually, will.
+"Yes, our progress has been uneven," he told a crowd of some 18,000. "The work of democracy has always been hard, contentious and sometimes bloody. For every two steps forward, it often feels we take one step back."
+Yet Obama argued his faith in America had only been strengthened by what he's witnessed the past eight years, and he declared: "The future should be ours."
+Brushing away tears with a handkerchief, Obama paid tribute to the sacrifices made by his wife - and by his daughters, who were young girls when they entered the big white home on Pennsylvania Avenue and leave as young women. He praised first lady Michelle Obama for taking on her role "with grace and grit and style and good humor" and for making the White House "a place that belongs to everybody."
+Soon Obama and his family will exit the national stage, to be replaced by Trump, a man Obama had stridently argued poses a dire threat to the nation's future. His near-apocalyptic warnings throughout the campaign have cast a continuing shadow over his post-election efforts to reassure Americans anxious about the future.
+Indeed, much of what Obama accomplished during his two terms - from health care overhaul and environmental regulations to his nuclear deal with Iran - could potentially be upended by Trump. So even as Obama seeks to define what his presidency meant for America, his legacy remains in question.
+Even as Obama said farewell - in a televised speech of just under an hour - the anxiety felt by many Americans about the future was palpable, and not only in the Chicago convention center where he stood in front of a giant presidential seal. The political world was reeling from new revelations about an unsubstantiated report that Russia had compromising personal and financial information about Trump.`
+const enc = xorCharByChar(clear, 'ObeyUSReaktor')
 // solve and print the solution
 console.log(new Buffer(enc).toString('base64'))
 console.log(solveRepeatingCipher(new Buffer(enc, 'hex')))
 // challenge8()
+
+const caesared = caesar('First obstacle cleared, request access to the Reaktor VIP-lounge with the keyword ReaktorDisobey2017', 15)
+console.log('caesar', caesared)
+console.log(breakCaesar(caesared))
+const vigenered = vigenere(clear, 'reaktor')
+// const vigenered = vigenere('Second obstacle cleared, access to the Reaktor VIP-lounge will be granted with the keyword SpaceIsTheNextFrontier', 'reaktor')
+console.log('vigénere', vigenered)
+// console.log(breakVigenere(vigenered))
